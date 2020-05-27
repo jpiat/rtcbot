@@ -11,22 +11,28 @@ class Keyboard {
    *    console.log(event); // prints the button and joystick events
    *  })
    */
-  constructor() {
+  constructor(repeat_ms=-1) {
     this._de = this._downEvent.bind(this);
     this._ue = this._upEvent.bind(this);
     window.addEventListener("keydown", this._de);
     window.addEventListener("keyup", this._ue);
     this._subscription = console.log;
+    this.keys_timestamp = {};
+    this.repeat_ms = repeat_ms ;
   }
   _downEvent(e) {
-    if (!e.repeat) {
+
+    if(e.repeat && this.repeat_ms < 0){
+	//We apparently don't want repeat
+    }else if((!e.repeat) || !(e.keyCode in this.keys_timestamp) || ((e.timeStamp - this.keys_timestamp[e.keyCode]) > this.repeat_ms )){ 
+      this.keys_timestamp[e.keyCode] = e.timeStamp ;
       this._subscription({
         type: e.type,
         altKey: e.altKey,
         shiftKey: e.shiftKey,
         keyCode: e.keyCode,
         key: e.key,
-        timestamp: e.timestamp
+        timestamp: e.timeStamp
       });
     }
     e.preventDefault();
@@ -38,7 +44,7 @@ class Keyboard {
       shiftKey: e.shiftKey,
       keyCode: e.keyCode,
       key: e.key,
-      timestamp: e.timestamp
+      timestamp: e.timeStamp
     });
     e.preventDefault();
   }
