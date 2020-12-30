@@ -125,7 +125,7 @@ async def index(request):
     </html>
     """)
 
-async def cleanup(app):
+async def cleanup(app=None):
     global ws
     if ws is not None:
         c = ws.close()
@@ -171,10 +171,9 @@ finally:
 
 With these two pieces of code, you first start the server, then start the robot, and finally open `http://localhost:8080` in the browser to view a video stream coming directly from the robot, even if the robot has an unknown IP.
 
-
 ## rtcbot.dev
 
-The above example requires you to have your own internet-accessible server at a known IP address to set up the connection, if your remote code is not on your local network. The server's only real purpose is to help *establish* a connection - once the connection is established, it does not do anything.
+The above example requires you to have your own internet-accessible server at a known IP address to set up the connection, if your remote code is not on your local network. The server's only real purpose is to help _establish_ a connection - once the connection is established, it does not do anything.
 
 For this reason, I am hosting a free testing server online at `https://rtcbot.dev` that performs the equivalent of the following operation from the above server code:
 
@@ -226,13 +225,13 @@ and the local browser's connection code becomes:
 
 ```js
 let response = await fetch("https://rtcbot.dev/myRandomSequence11", {
-    method: "POST",
-    cache: "no-cache",
-    body: JSON.stringify(offer)
+  method: "POST",
+  cache: "no-cache",
+  body: JSON.stringify(offer),
 });
 ```
-With `rtcbot.dev`, you no longer need your local server code to run websockets or a connection service. Its only purpose is to give the browser the html and javascript necessary to establish a connection. We will get rid of the browser entirely in the next tutorial.
 
+With `rtcbot.dev`, you no longer need your local server code to run websockets or a connection service. Its only purpose is to give the browser the html and javascript necessary to establish a connection. We will get rid of the browser entirely in the next tutorial.
 
 ## If it doesn't work over 4G
 
@@ -249,12 +248,14 @@ The above example should work for most people. However, some mobile network oper
     exceed your download and upload limits!
 ```
 
-While installing and configuring [coTURN](https://github.com/coturn/coturn) on linux is recommended for permanent setups,
-for simplicity we will run the [Pion TURN server](https://github.com/pion/turn) on the same computer that is running our server code.
+There are two options through which to setup a TURN server: [coTURN](https://github.com/coturn/coturn) and [Pion](https://github.com/pion/turn). Pion is meant to be a more simple and temporary solution that's easy to setup while coTURN is recommended for more permanent setups.
+
+### Setup with Pion
 
 The Pion server is easy to set up on Windows,Mac and Linux - all you need to do is [download the executable](https://github.com/pion/turn/releases/tag/1.0.3), and run it from the command line as shown.
 
 **Linux/Mac**:
+
 ```bash
 chmod +x ./simple-turn-linux-amd64 # allow executing the downloaded file
 export USERS='myusername=mypassword'
@@ -264,6 +265,7 @@ export UDP_PORT=3478
 ```
 
 **Windows**: You can run the following from powershell:
+
 ```powershell
 $env:USERS = "myusername=mypassword"
 $env:REALM = "my.server.ip"
@@ -271,7 +273,8 @@ $env:UDP_PORT = 3478
 ./simple-turn-windows-amd64.exe
 ```
 
-With the server running, you will need to let both Python and Javascript know about it when creating your `RTCConnection`:
+With the Pion server running, you will need to let both Python and Javascript know about it when creating your `RTCConnection`:
+
 ```python
 from aiortc import RTCConfiguration, RTCIceServer
 
@@ -283,15 +286,82 @@ myConnection = RTCConnection(rtcConfiguration=RTCConfiguration([
 ```
 
 ```javascript
-var conn = new rtcbot.RTCConnection(rtcConfiguration=[
+var conn = new rtcbot.RTCConnection(true, {
+                iceServers:[
                     { urls: ["stun:stun.l.google.com:19302"] },
-                    { urls: ["turn:my.server.ip:3478?transport=udp", 
-                        username: "myusername", credential: "mypassword"], },
+                    { urls: "turn:my.server.ip:3478?transport=udp",
+                        username: "myusername", credential: "mypassword", },
                 ]);
 ```
 
-With the above code, you should be able to stream video to your browser using 4G, even if your mobile operator disallows direct connections.
+### Setup with coTURN
 
+Setting up a coTURN server takes a bit more work and is only supported on Linux and Mac. The following steps will assume a Linux system running Ubuntu.
+
+Install coTURN and stop the coTURN service to modify config files with
+
+```bash
+sudo apt install coturn
+sudo systemctl stop coturn
+```
+
+Edit the file `/etc/default/coturn` by uncommenting the line `TURNSERVER_ENABLED=1`. This will allow coTURN to start in daemon mode on boot.
+
+Edit another file `/etc/turnserver.conf` and add the following lines. Be sure to put your system's public facing IP address in place of `<PUBLIC_NETWORK_IP>`, your domain name in place of `<DOMAIN>`, and your own credentials in place of `<USERNAME>` and `<PASSWORD>`.
+
+```
+listening-port=3478
+tls-listening-port=5349
+listening-ip=<PUBLIC_NETWORK_IP>
+relay-ip=<PUBLIC_NETWORK_IP>
+external-ip=<PUBLIC_NETWORK_IP>
+realm=<DOMAIN>
+server-name=<DOMAIN>
+
+user=<USERNAME>:<PASSWORD>
+lt-cred-mech
+```
+
+```eval_rst
+.. note::
+    If you are running coTURN within a local network, <DOMAIN> can be whatever you want.
+```
+
+Restart the coTURN service, check that it's running, and reboot.
+
+```bash
+sudo systemctl start coturn
+sudo systemctl status coturn
+sudo reboot
+```
+
+With the coTURN server running, you will need to let both Python and Javascript know about it when creating your `RTCConnection`:
+
+```python
+from aiortc import RTCConfiguration, RTCIceServer
+
+myConnection = RTCConnection(rtcConfiguration=RTCConfiguration([
+                    RTCIceServer(urls="stun:stun.l.google.com:19302"),
+                    RTCIceServer(urls="turn:<PUBLIC_NETWORK_IP>:3478",
+                        username="myusername",credential="mypassword")
+                ]))
+```
+
+```javascript
+var conn = new rtcbot.RTCConnection(true, {
+                iceServers:[
+                    { urls: ["stun:stun.l.google.com:19302"] },
+                    { urls: "turn:<PUBLIC_NETWORK_IP:3478?transport=udp",
+                        username: "myusername", credential: "mypassword", },
+                ]);
+```
+
+```eval_rst
+.. note::
+    If you are running coTURN on a local network, replace <PUBLIC_NETWORK_IP> with the public facing IP of the system running coTURN. If coTURN is running on a server with a domain, replace <PUBLIC_NETWORK_IP> with the domain/realm set in /etc/turnserver.conf.
+```
+
+With either of the options above, you should be able to stream video to your browser using 4G, even if your mobile operator disallows direct connections.
 
 ## Summary
 

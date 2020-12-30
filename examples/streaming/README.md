@@ -71,7 +71,7 @@ async def index(request):
     </html>
     """)
 
-async def cleanup(app):
+async def cleanup(app=None):
     await conn.close()
 
 app = web.Application()
@@ -161,7 +161,7 @@ All you need is to add a couple lines of code to the skeleton to get a fully-fun
      </html>
      """)
 
- async def cleanup(app):
+ async def cleanup(app=None):
      await conn.close()
 +    camera.close() # Singletons like a camera are not awaited on close
 
@@ -205,10 +205,10 @@ Also, don't forget to close the microphone at the end with `mic.close()`. The ja
 ```javascript
 var conn = new RTCConnection();
 
-conn.video.subscribe(function(stream) {
+conn.video.subscribe(function (stream) {
   document.querySelector("video").srcObject = stream;
 });
-conn.audio.subscribe(function(stream) {
+conn.audio.subscribe(function (stream) {
   document.querySelector("audio").srcObject = stream;
 });
 ```
@@ -295,7 +295,7 @@ async def index(request):
     </html>
     """)
 
-async def cleanup(app):
+async def cleanup(app=None):
     await conn.close()
     display.close()
     speaker.close()

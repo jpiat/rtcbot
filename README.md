@@ -33,6 +33,7 @@ sudo apt-get install build-essential python3-numpy python3-cffi python3-aiohttp 
 ```
 
 And then install rtcbot:
+
 ```bash
 sudo pip3 install rtcbot
 ```
@@ -73,7 +74,7 @@ async def index(request):
     with open("index.html", "r") as f:
         return web.Response(content_type="text/html", text=f.read())
 
-async def cleanup(app):
+async def cleanup(app=None):
     await conn.close()
     camera.close()
 
@@ -99,7 +100,7 @@ Browser code (index.html) that displays the video stream:
     <script>
       var conn = new rtcbot.RTCConnection();
 
-      conn.video.subscribe(function(stream) {
+      conn.video.subscribe(function (stream) {
         document.querySelector("video").srcObject = stream;
       });
 
@@ -110,7 +111,7 @@ Browser code (index.html) that displays the video stream:
         let response = await fetch("/connect", {
           method: "POST",
           cache: "no-cache",
-          body: JSON.stringify(offer)
+          body: JSON.stringify(offer),
         });
 
         await conn.setRemoteDescription(await response.json());

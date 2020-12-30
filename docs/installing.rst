@@ -22,13 +22,16 @@ Then, you can complete the installation with pip::
 
     sudo pip3 install rtcbot
 
+.. warning::
+    You might need to reboot your Pi for RTCBot to work! If rtcbot freezes on import, it means that you need to start PulseAudio.
+
 .. note::
     It is recommended that you use the Pi 4 with RTCBot. While it was tested to work down to the Raspberry Pi 3B, it was observed to have
     extra latency, since the CPU had difficulty keeping up with encoding the video stream while processing controller input.
     This is because RTCBot currently cannot take advantage of the Pi's hardware acceleration, 
     meaning that all video encoding is done in software.
 
-.. warning::
+.. note::
     These instructions were made with reference to Raspbian Buster.
     While the library *does* work on Raspbian Stretch,
     you'll need to install aiohttp through pip, and avoid installing opencv.
@@ -46,6 +49,9 @@ RTCbot requires several dependencies which are best installed using apt-get::
 Then, you can complete the installation with pip::
 
     sudo pip3 install rtcbot
+
+.. warning::
+    You might need to reboot, or manually start PulseAudio if it was not previously installed. If RTCBot freezes on import, it means that PulseAudio is not running.
 
 Mac
 +++++++++++
