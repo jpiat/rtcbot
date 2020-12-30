@@ -3,11 +3,13 @@ from aiortc import (
     RTCSessionDescription,
     RTCConfiguration,
     RTCIceServer,
+    RTCRtpCodecCapability,
     exceptions,
 )
 import asyncio
 import logging
 import json
+from collections import OrderedDict
 
 from .base import (
     SubscriptionProducerConsumer,
@@ -17,7 +19,7 @@ from .base import (
 )
 from .tracks import VideoSender, AudioSender, AudioReceiver, VideoReceiver
 from .subscriptions import MostRecentSubscription
-
+from .camera import PiCamera
 
 class DataChannel(SubscriptionProducerConsumer):
     """
@@ -157,7 +159,7 @@ class ConnectionVideoHandler(SubscriptionProducerConsumer):
         self.offerToReceive()
         return self._trackSubscriber.subscribe(callback)
 
-    def addTrack(self, frameSubscription=None, fps=None, canSkip=True):
+    def addTrack(self, frameSubscription=None, fps=None, canSkip=True, encoded=False):
         """
         Allows to send multiple video tracks in a single connection.
         Each call to putTrack *adds* the track to the connection.
@@ -165,7 +167,7 @@ class ConnectionVideoHandler(SubscriptionProducerConsumer):
         just use `putSubscription` - it automatically calls putTrack for you.
         """
         self._log.debug("Adding video track to connection")
-        s = VideoSender(fps=fps, canSkip=True)
+        s = VideoSender(fps=fps, canSkip=True, encoded=encoded)
         if frameSubscription is not None:
             s.putSubscription(frameSubscription)
         elif self._defaultSender is None:
@@ -184,7 +186,10 @@ class ConnectionVideoHandler(SubscriptionProducerConsumer):
         # 2) the track is subscribed to the VideoHandler
         super().putSubscription(subscription)
         if self._defaultSender is None:
-            self.addTrack()
+            if isinstance(subscription, PiCamera):
+                self.addTrack(encoded=True)
+            else:
+                self.addTrack()
         # Make sure that this subscription is active on the default track
         self._defaultSender.putSubscription(self._defaultSenderSubscription)
 
@@ -362,6 +367,8 @@ class RTCConnection(SubscriptionProducerConsumer):
         rtcConfiguration=RTCConfiguration(
             [RTCIceServer(urls="stun:stun.l.google.com:19302")]
         ),
+        video_codec_preference=None,
+        audio_codec_preference=None,
     ):
         super().__init__(
             directPutSubscriptionType=asyncio.Queue,
@@ -387,7 +394,9 @@ class RTCConnection(SubscriptionProducerConsumer):
         self._defaultChannelOrdered = defaultChannelOrdered
 
         self._videoHandler = ConnectionVideoHandler(self._rtc)
+        self._video_codec_preference = video_codec_preference
         self._audioHandler = ConnectionAudioHandler(self._rtc)
+        self._audio_codec_preference = audio_codec_preference
 
         # When the video/audio handlers get closed, close the entire connection
         self._videoHandler.onClose(self.close)
@@ -399,6 +408,13 @@ class RTCConnection(SubscriptionProducerConsumer):
         if no remote description was passed, and creates a response if
         a remote was given,
         """
+
+        for t in self._rtc.getTransceivers():
+            if t.kind == "video" and self._video_codec_preference is not None:
+               t.setCodecPreferences(self._video_codec_preference)
+            elif t.kind == "audio" and self._audio_codec_preference is not None:
+               t.setCodecPreferences(self._audio_codec_preference)
+
         if self._hasRemoteDescription or description is not None:
             # This means that we received an offer - either the remote description
             # was already set, or we passed in a description. In either case,

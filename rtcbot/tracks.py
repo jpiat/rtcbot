@@ -19,6 +19,7 @@ from .subscriptions import (
     GetterSubscription,
     MostRecentSubscription,
 )
+from .pitrack import PiH264StreamTrack
 from .base import BaseSubscriptionProducer, BaseSubscriptionConsumer, SubscriptionClosed
 
 
@@ -151,6 +152,7 @@ class AudioSender(BaseSubscriptionConsumer):
         super().close()
 
 
+
 class _videoSenderTrack(VideoStreamTrack):
 
     _log = logging.getLogger("rtcbot.RTCConnection.VideoSender")
@@ -220,7 +222,7 @@ class _videoSenderTrack(VideoStreamTrack):
 class VideoSender(BaseSubscriptionConsumer):
     _log = logging.getLogger("rtcbot.RTCConnection.VideoSender")
 
-    def __init__(self, fps=None, canSkip=True):
+    def __init__(self, fps=None, canSkip=True, encoded=False):
         super().__init__(MostRecentSubscription, logger=self._log)
 
         def readySetter():
@@ -228,12 +230,15 @@ class VideoSender(BaseSubscriptionConsumer):
 
         # The RTCConnection will take this object, and aiortc
         # will take it from here.
-        self.videoStreamTrack = _videoSenderTrack(
-            GetterSubscription(self._get),
-            fps=fps,
-            canSkip=canSkip,
-            startedCallback=readySetter,
-        )
+        if encoded:
+            self.videoStreamTrack = PiH264StreamTrack(GetterSubscription(self._get), fps=fps, startedCallback=readySetter)
+        else:
+            self.videoStreamTrack = _videoSenderTrack(
+                GetterSubscription(self._get),
+                fps=fps,
+                canSkip=canSkip,
+                startedCallback=readySetter,
+            )
 
     def close(self):
         # self.videoStreamTrack.stop()

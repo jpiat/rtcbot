@@ -31,6 +31,7 @@ class CVCamera(ThreadedSubscriptionProducer):
         height=240,
         cameranumber=0,
         fps=30,
+        rotation=0,
         preprocessframe=lambda x: x,
         loop=None,
     ):
@@ -39,6 +40,7 @@ class CVCamera(ThreadedSubscriptionProducer):
         self._height = height
         self._cameranumber = cameranumber
         self._fps = fps
+        self._rotation = rotation
         self._processframe = preprocessframe
 
         super().__init__(MostRecentSubscription, self._log, loop=loop)
@@ -131,6 +133,18 @@ class PiCamera(CVCamera):
 
     This enables simple drop-in replacement between the two.
     """
+    class PiCameraH264Buffer:
+
+         def __init__(self, parent):
+             self.parent = parent
+             self.queue = queue.Queue(10)
+
+         def write(self, buf):
+             if self.queue.full():  # Flushing to avoid being out of sync
+                while not self.queue.empty():
+                      self.queue.get()
+             if buf is not None:
+                self.queue.put(buf)
 
     _log = logging.getLogger("rtcbot.PiCamera")
 
@@ -140,24 +154,32 @@ class PiCamera(CVCamera):
         with picamera.PiCamera() as cam:
             cam.resolution = (self._width, self._height)
             cam.framerate = self._fps
+            if self._width == self._height:
+               cam.rotation = self._rotation
             time.sleep(2)  # Why is this needed?
             self._log.debug("PiCamera Ready")
             self._setReady(True)
 
             t = time.time()
             i = 0
+            buffer_encoder = PiCamera.PiCameraH264Buffer(self)
+            cam.start_recording(buffer_encoder, format='h264', profile="constrained", inline_headers=True, sei=False)
             while not self._shouldClose:
                 # https://picamera.readthedocs.io/en/release-1.13/recipes2.html#capturing-to-an-opencv-object
-                frame = np.empty((self._width * self._height * 3,), dtype=np.uint8)
+                '''frame = np.empty((self._width * self._height * 3,), dtype=np.uint8)
                 cam.capture(frame, "bgr", use_video_port=True)
-                frame = frame.reshape((self._height, self._width, 3))
+                if abs(self._rotation) == 90 or abs(self._rotation) == 270 :
+                    frame = frame.reshape((self._width, self._height, 3))
+                else:
+                    frame = frame.reshape((self._height, self._width, 3))#
 
                 # This optional function is given by the user. default is identity x->x
-                frame = self._processframe(frame)
+                frame = self._processframe(frame)'''
 
                 # Set the frame arrival event
-                self._loop.call_soon_threadsafe(self._put_nowait, frame)
-
+                #self._loop.call_soon_threadsafe(self._put_nowait, frame)
+                b = buffer_encoder.queue.get()
+                self._loop.call_soon_threadsafe(self._put_nowait, b)
                 i += 1
                 if time.time() > t + 1:
                     self._log.debug(" %d fps", i)

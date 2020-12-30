@@ -42,6 +42,7 @@ class Microphone(ThreadedSubscriptionProducer):
         blocksize: int = 1024,
         device=None,
         loop=None,
+        gain=1,
     ):
         if device is None:
             device = sc.default_microphone()
@@ -50,7 +51,7 @@ class Microphone(ThreadedSubscriptionProducer):
         self._samplerate = samplerate
         self._channels = channels
         self._blocksize = blocksize
-
+        self._gain = gain
         super().__init__(defaultSubscriptionType=asyncio.Queue, logger=self._log)
 
     def _producer(self):
@@ -67,6 +68,7 @@ class Microphone(ThreadedSubscriptionProducer):
                 try:
                     # TODO: Perhaps some way to time out this command if something froze?
                     audioData = recorder.record(self._blocksize)
+                    audioData = audioData*self._gain
                     self._put_nowait(audioData)
                 except:
                     self._log.exception("Error while trying to record audio")
