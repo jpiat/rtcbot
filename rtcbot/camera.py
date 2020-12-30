@@ -135,14 +135,13 @@ class PiCamera(CVCamera):
     """
     class PiCameraH264Buffer:
 
-         def __init__(self, parent):
-             self.parent = parent
-             self.queue = queue.Queue(10)
+         def __init__(self, fps = 30):
+             self.queue = queue.Queue(fps/2+2)
 
          def write(self, buf):
-             if self.queue.full():  # Flushing to avoid being out of sync
-                while not self.queue.empty():
-                      self.queue.get()
+             #if self.queue.full():  # Flushing to avoid being out of sync
+             #   while not self.queue.empty():
+             #         self.queue.get()
              if buf is not None:
                 self.queue.put(buf)
 
@@ -162,8 +161,8 @@ class PiCamera(CVCamera):
 
             t = time.time()
             i = 0
-            buffer_encoder = PiCamera.PiCameraH264Buffer(self)
-            cam.start_recording(buffer_encoder, format='h264', profile="constrained", inline_headers=True, sei=False)
+            buffer_encoder = PiCamera.PiCameraH264Buffer(self._fps)
+            cam.start_recording(buffer_encoder, format='h264', profile="constrained", inline_headers=True, sei=False, intra_period = int(self._fps/2)+2)
             while not self._shouldClose:
                 # https://picamera.readthedocs.io/en/release-1.13/recipes2.html#capturing-to-an-opencv-object
                 '''frame = np.empty((self._width * self._height * 3,), dtype=np.uint8)
@@ -171,7 +170,7 @@ class PiCamera(CVCamera):
                 if abs(self._rotation) == 90 or abs(self._rotation) == 270 :
                     frame = frame.reshape((self._width, self._height, 3))
                 else:
-                    frame = frame.reshape((self._height, self._width, 3))#
+                    frame = frame.reshape((self._height, self._width, 3))
 
                 # This optional function is given by the user. default is identity x->x
                 frame = self._processframe(frame)'''
