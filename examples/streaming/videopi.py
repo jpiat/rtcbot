@@ -20,7 +20,7 @@ pi_capability = RTCRtpCodecCapability(
 preferences = [pi_capability]
 
 
-camera = PiCamera(fps=30, width=640, height=480)
+camera = PiCamera(fps=15, width=640, height=480)
 # For this example, we use just one global connection
 conn = RTCConnection(video_codec_preference=preferences)
 conn.video.putSubscription(camera)

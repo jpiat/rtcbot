@@ -136,14 +136,18 @@ class PiCamera(CVCamera):
     class PiCameraH264Buffer:
 
          def __init__(self, fps = 30):
+             self.nal_buffer = None
              self.queue = queue.Queue(fps/2+2)
 
          def write(self, buf):
-             #if self.queue.full():  # Flushing to avoid being out of sync
-             #   while not self.queue.empty():
-             #         self.queue.get()
-             if buf is not None:
-                self.queue.put(buf)
+             if self.nal_buffer is None:
+                self.nal_buffer = buf
+             else:
+                self.nal_buffer += buf
+             if self.nal_buffer is not None and len(self.nal_buffer) > 64:
+                if not self.queue.full():
+                    self.queue.put(self.nal_buffer)
+                self.nal_buffer = None
 
     _log = logging.getLogger("rtcbot.PiCamera")
 
