@@ -157,12 +157,10 @@ class PiCamera(CVCamera):
         with picamera.PiCamera() as cam:
             cam.resolution = (self._width, self._height)
             cam.framerate = self._fps
-            if self._width == self._height:
-               cam.rotation = self._rotation
+            cam.rotation = self._rotation
             time.sleep(2)  # Why is this needed?
             self._log.debug("PiCamera Ready")
             self._setReady(True)
-
             t = time.time()
             i = 0
             buffer_encoder = PiCamera.PiCameraH264Buffer(self._fps)
